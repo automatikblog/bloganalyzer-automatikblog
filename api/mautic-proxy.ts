@@ -1,6 +1,3 @@
-import getRawBody from 'raw-body';
-
-// Desabilita o parser padrão para conseguirmos o corpo cru (multipart)
 export const config = {
   api: {
     bodyParser: false,
@@ -13,8 +10,18 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Lê o corpo cru da requisição (Buffer) de forma compatível com Vercel
+    // Importa raw-body dinamicamente (compatível com ESM)
+    const getRawBody = (await import('raw-body')).default;
     const bodyBuffer = await getRawBody(req);
+
+    // Converte o buffer para FormData
+    const formData = new FormData();
+    const text = bodyBuffer.toString('utf-8');
+    const params = new URLSearchParams(text);
+    
+    for (const [key, value] of params.entries()) {
+      formData.append(key, value);
+    }
 
     // Repassa para o Mautic
     const mauticResponse = await fetch(
@@ -22,16 +29,24 @@ export default async function handler(req: any, res: any) {
       {
         method: 'POST',
         headers: {
-          'Content-Type': req.headers['content-type'] || 'application/octet-stream',
+          'Content-Type': 'multipart/form-data',
         },
-        body: bodyBuffer,
+        body: formData,
       }
     )
+
+    if (!mauticResponse.ok) {
+      throw new Error(`Mautic retornou status ${mauticResponse.status}`);
+    }
 
     const data = await mauticResponse.text()
     res.status(mauticResponse.status).send(data)
   } catch (err: any) {
     console.error('Erro no proxy Mautic:', err);
-    res.status(500).json({ error: 'Erro ao repassar para o Mautic', details: err?.message, stack: err?.stack });
+    res.status(500).json({ 
+      error: 'Erro ao repassar para o Mautic', 
+      details: err?.message,
+      stack: process.env.NODE_ENV === 'development' ? err?.stack : undefined 
+    });
   }
 } 
