@@ -11,30 +11,24 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Lê o corpo cru da requisição (Buffer)
-    const chunks: Buffer[] = []
-    await new Promise<void>((resolve, reject) => {
-      req.on('data', (chunk) => chunks.push(chunk))
-      req.on('end', resolve)
-      req.on('error', reject)
-    })
-    const bodyBuffer = Buffer.concat(chunks)
+    // Clona os cabeçalhos relevantes (exceto host)
+    const headers: Record<string, string> = {}
+    if (req.headers['content-type']) headers['Content-Type'] = req.headers['content-type']
 
-    // Encaminha ao Mautic preservando o Content-Type recebido
+    // Repassa a stream diretamente para o Mautic
     const mauticResponse = await fetch(
       'https://mautic.automatiklabs.com/form/submit?formId=14',
       {
         method: 'POST',
-        headers: {
-          'Content-Type': req.headers['content-type'] || 'application/octet-stream',
-        },
-        body: bodyBuffer,
-      }
+        headers,
+        body: req, // Request é uma stream legível
+      },
     )
 
-    const text = await mauticResponse.text()
-    return res.status(mauticResponse.status).send(text)
+    // Reenvia a resposta do Mautic tal qual
+    const data = await mauticResponse.text()
+    res.status(mauticResponse.status).send(data)
   } catch (err: any) {
-    return res.status(500).json({ error: 'Erro ao repassar para o Mautic', details: err?.message })
+    res.status(500).json({ error: 'Erro ao repassar para o Mautic', details: err?.message })
   }
 } 
