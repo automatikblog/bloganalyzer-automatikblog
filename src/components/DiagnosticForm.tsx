@@ -296,17 +296,20 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
               setError("");
               setMsg("");
               // Montar dados para Mautic com nomes corretos
-              const mauticData = new FormData();
-              mauticData.append('mauticform[formId]', '14');
-              mauticData.append('mauticform[formName]', 'appanalyze');
-              Object.entries(formData).forEach(([k, v]) => {
-                mauticData.append(`mauticform[${k}]`, v);
-              });
+              const mauticData = {
+                'mauticform[formId]': '14',
+                'mauticform[formName]': 'appanalyze',
+                ...Object.fromEntries(
+                  Object.entries(formData).map(([k, v]) => [`mauticform[${k}]`, v])
+                ),
+              };
               // Enviar para Mautic
               fetch('/api/mautic-proxy', {
                 method: 'POST',
-                body: mauticData,
-                mode: 'no-cors',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams(mauticData).toString(),
               });
               // Enviar para o backend (webhook)
               try {
