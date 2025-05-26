@@ -1,3 +1,5 @@
+import getRawBody from 'raw-body';
+
 // Desabilita o parser padrão para conseguirmos o corpo cru (multipart)
 export const config = {
   api: {
@@ -11,14 +13,8 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Lê o corpo cru da requisição (Buffer)
-    const chunks: Buffer[] = []
-    await new Promise<void>((resolve, reject) => {
-      req.on('data', (chunk: Buffer) => chunks.push(chunk))
-      req.on('end', resolve)
-      req.on('error', reject)
-    })
-    const bodyBuffer = Buffer.concat(chunks)
+    // Lê o corpo cru da requisição (Buffer) de forma compatível com Vercel
+    const bodyBuffer = await getRawBody(req);
 
     // Repassa para o Mautic
     const mauticResponse = await fetch(
