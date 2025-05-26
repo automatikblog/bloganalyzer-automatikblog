@@ -11,21 +11,27 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Clona os cabeçalhos relevantes (exceto host)
-    const headers: Record<string, string> = {}
-    if (req.headers['content-type']) headers['Content-Type'] = req.headers['content-type']
+    // Lê o corpo cru da requisição (Buffer)
+    const chunks: Buffer[] = []
+    await new Promise<void>((resolve, reject) => {
+      req.on('data', (chunk: Buffer) => chunks.push(chunk))
+      req.on('end', resolve)
+      req.on('error', reject)
+    })
+    const bodyBuffer = Buffer.concat(chunks)
 
-    // Repassa a stream diretamente para o Mautic
+    // Repassa para o Mautic
     const mauticResponse = await fetch(
       'https://mautic.automatiklabs.com/form/submit?formId=14',
       {
         method: 'POST',
-        headers,
-        body: req, // Request é uma stream legível
-      },
+        headers: {
+          'Content-Type': req.headers['content-type'] || 'application/octet-stream',
+        },
+        body: bodyBuffer,
+      }
     )
 
-    // Reenvia a resposta do Mautic tal qual
     const data = await mauticResponse.text()
     res.status(mauticResponse.status).send(data)
   } catch (err: any) {
