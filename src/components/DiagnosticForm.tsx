@@ -18,17 +18,32 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
     nome: '',
     email: '',
     telefone: '',
-    faturamento: ''
+    utm_source: '',
+    utm_campaign: '',
+    utm_medium: '',
+    utm_content: '',
+    utm_term: '',
+    cidade: '',
+    estado: '',
+    pais: '',
+    dispositivo: '',
+    url_pagina: '',
+    app_blogwp: '',
+    app_plano: '',
+    faturamento_com_blog: '',
   });
   const [timeoutProgress, setTimeoutProgress] = useState(0);
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   
   const { toast } = useToast();
   const { 
     data: results, 
     isLoading, 
-    error, 
+    error: supabaseError, 
     recordId: hookRecordId, 
     createWebhookRecord
   } = useSupabaseWebhook(url);
@@ -102,14 +117,41 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
 
   // Show error toast when error state changes
   useEffect(() => {
-    if (error) {
+    if (supabaseError) {
       toast({
         title: "Erro na análise",
-        description: error.message,
+        description: supabaseError.message,
         variant: "destructive"
       });
     }
-  }, [error, toast]);
+  }, [supabaseError, toast]);
+
+  // Preenchimento automático dos campos extras
+  useEffect(() => {
+    // UTM
+    const params = new URLSearchParams(window.location.search);
+    setFormData((f) => ({
+      ...f,
+      utm_source: params.get('utm_source') || '',
+      utm_campaign: params.get('utm_campaign') || '',
+      utm_medium: params.get('utm_medium') || '',
+      utm_content: params.get('utm_content') || '',
+      utm_term: params.get('utm_term') || '',
+      url_pagina: window.location.href,
+      dispositivo: navigator.userAgent,
+    }));
+    // Localização
+    fetch('https://ipinfo.io/json')
+      .then((res) => res.json())
+      .then((data) => {
+        setFormData((f) => ({
+          ...f,
+          cidade: data.city || '',
+          estado: data.region || '',
+          pais: data.country || '',
+        }));
+      });
+  }, []);
 
   const isValidWordPressURL = (url: string) => {
     const urlPattern = /^(https?:\/\/)?([\w-]+(\.[\w-]+)+)\/?$/;
@@ -133,149 +175,23 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
     setIsDialogOpen(true);
   };
   
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTelefone = (value: string) => {
+    value = value.replace(/\D/g, '');
+    if (value.length > 11) value = value.slice(0, 11);
+    if (value.length > 6)
+      value = value.replace(/^(\d{2})(\d{5})(\d{0,4})$/, '($1) $2-$3');
+    else if (value.length > 2)
+      value = value.replace(/^(\d{2})(\d{0,5})$/, '($1) $2');
+    else value = value.replace(/^(\d{0,2})/, '($1');
+    return value;
+  };
+
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handleFaturamentoChange = (value: string) => {
-    setFormData(prev => ({ ...prev, faturamento: value }));
-  };
-  
-  const handleAnalyzeSubmit = async () => {
-    if (!formData.nome || !formData.email || !formData.telefone || !formData.faturamento) {
-      toast({
-        title: "Dados incompletos",
-        description: "Por favor, preencha todos os campos do formulário.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsDialogOpen(false);
-    setFormSubmitted(true);
-    
-    try {
-      const newRecordId = await createWebhookRecord({
-        url,
-        ...formData,
-        results: '' // Include empty initial results as plain string
-      });
-      
-      if (!newRecordId) {
-        throw new Error('Falha ao criar registro no Supabase');
-      }
-      
-      console.log('Created Supabase record with ID:', newRecordId);
-      
-      const payload = {
-        url,
-        ...formData,
-        record_id: newRecordId,
-        results: '' // Include empty initial results as a string
-      };
-      
-      // Primeiro webhook - Envia para o backend AutomatikLabs
-      console.log('Sending data to AutomatikLabs webhook:', payload);
-      const automatikResponse = await fetch('https://webhooks.automatiklabs.com/webhook/testar-blog', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!automatikResponse.ok) {
-        console.error('Error response from AutomatikLabs webhook:', automatikResponse.status);
-        const errorText = await automatikResponse.text();
-        console.error('Error details:', errorText);
-        
-        toast({
-          title: "Erro na comunicação",
-          description: `O servidor retornou um erro: ${automatikResponse.status}`,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Pegar os resultados do AutomatikLabs
-      const automatikData = await automatikResponse.json();
-      console.log('AutomatikLabs response (raw):', automatikData);
-      console.log('AutomatikLabs response type:', typeof automatikData);
-      
-      // Garantir que temos uma string de resultados
-      let resultsString = '';
-      if (typeof automatikData === 'string') {
-        resultsString = automatikData;
-      } else if (automatikData && typeof automatikData === 'object') {
-        if (automatikData.results) {
-          resultsString = typeof automatikData.results === 'string' 
-            ? automatikData.results 
-            : JSON.stringify(automatikData.results);
-        } else {
-          resultsString = JSON.stringify(automatikData);
-        }
-      }
-      
-      console.log('Processed results string:', resultsString);
-
-      // Segundo webhook - Atualiza o Supabase com os resultados do AutomatikLabs
-      console.log('Sending data to Supabase webhook:', {
-        ...payload,
-        results: resultsString
-      });
-      const supabaseResponse = await fetch('https://rgtolkmdzhmwotkvbone.supabase.co/functions/v1/webhook-receiver', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...payload,
-          results: resultsString
-        }),
-      });
-
-      const responseData = await supabaseResponse.json();
-      console.log('Supabase webhook response:', responseData);
-
-      if (!supabaseResponse.ok) {
-        console.error('Error response from Supabase webhook:', supabaseResponse.status);
-        console.error('Error details:', responseData);
-        
-        toast({
-          title: "Erro na atualização",
-          description: `Erro ao atualizar o Supabase: ${responseData.error || supabaseResponse.status}`,
-          variant: "destructive"
-        });
-      } else {
-        console.log('Update successful:', responseData.debug);
-      }
-      
-      const timeout = setTimeout(() => {
-        if (isLoading) {
-          toast({
-            title: "Tempo esgotado",
-            description: "O backend não respondeu dentro do tempo limite.",
-            variant: "destructive"
-          });
-        }
-      }, 120000); // 2 minutes
-      
-      setTimeoutId(timeout);
-    } catch (error) {
-      console.error('Error sending data:', error);
-      
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        setTimeoutId(null);
-      }
-      
-      setFormSubmitted(false);
-      toast({
-        title: "Erro na análise",
-        description: error instanceof Error ? error.message : "Ocorreu um erro ao analisar seu blog. Por favor, tente novamente.",
-        variant: "destructive"
-      });
+    if (name === 'telefone') {
+      setFormData((prev) => ({ ...prev, telefone: handleTelefone(value) }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
   
@@ -372,65 +288,158 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
           <DialogHeader>
             <DialogTitle>Complete seus dados para análise</DialogTitle>
           </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
+          <form
+            className="grid gap-4 py-4"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setLoading(true);
+              setError("");
+              setMsg("");
+              // Montar dados para Mautic com nomes corretos
+              const mauticData = new FormData();
+              mauticData.append('mauticform[formId]', '14');
+              mauticData.append('mauticform[formName]', 'appanalyze');
+              Object.entries(formData).forEach(([k, v]) => {
+                mauticData.append(`mauticform[${k}]`, v);
+              });
+              // Enviar para Mautic
+              fetch('/api/mautic-proxy', {
+                method: 'POST',
+                body: mauticData,
+                mode: 'no-cors',
+              });
+              // Enviar para o backend (webhook)
+              try {
+                const record_id = await createWebhookRecord({
+                  url: formData.url_pagina,
+                  nome: formData.nome,
+                  email: formData.email,
+                  telefone: formData.telefone,
+                  faturamento: formData.faturamento_com_blog,
+                  results: '',
+                });
+                const payload = {
+                  url: formData.url_pagina,
+                  nome: formData.nome,
+                  email: formData.email,
+                  telefone: formData.telefone,
+                  faturamento: formData.faturamento_com_blog,
+                  record_id,
+                };
+                await fetch('https://webhooks.automatiklabs.com/webhook/testar-blog', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload),
+                });
+                setMsg('Enviado com sucesso!');
+                setFormData({
+                  nome: '',
+                  email: '',
+                  telefone: '',
+                  utm_source: '',
+                  utm_campaign: '',
+                  utm_medium: '',
+                  utm_content: '',
+                  utm_term: '',
+                  cidade: '',
+                  estado: '',
+                  pais: '',
+                  dispositivo: '',
+                  url_pagina: '',
+                  app_blogwp: '',
+                  app_plano: '',
+                  faturamento_com_blog: '',
+                });
+              } catch (error) {
+                setError('Erro ao enviar o formulário.');
+              }
+              setLoading(false);
+              setIsDialogOpen(false);
+              setFormSubmitted(true);
+            }}
+            autoComplete="off"
+          >
+            {/* Nome */}
             <div className="grid gap-2">
               <Label htmlFor="nome">Nome</Label>
               <Input
                 id="nome"
                 name="nome"
+                className="px-4 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                 value={formData.nome}
                 onChange={handleFormChange}
+                required
               />
             </div>
-            
+            {/* Email */}
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
+                className="px-4 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                 value={formData.email}
                 onChange={handleFormChange}
+                required
               />
             </div>
-            
+            {/* Telefone */}
             <div className="grid gap-2">
               <Label htmlFor="telefone">Telefone</Label>
               <Input
                 id="telefone"
                 name="telefone"
+                className="px-4 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                 value={formData.telefone}
                 onChange={handleFormChange}
+                maxLength={15}
+                placeholder="(99) 99999-9999"
+                required
               />
             </div>
-            
+            {/* Faturamento com blog */}
             <div className="grid gap-2">
-              <Label>Faturamento mensal com o blog</Label>
-              <Select onValueChange={handleFaturamentoChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma faixa" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">Não faturo ainda</SelectItem>
-                  <SelectItem value="1-1000">Entre R$ 1 e R$ 1.000</SelectItem>
-                  <SelectItem value="1001-5000">Entre R$ 1.001 e R$ 5.000</SelectItem>
-                  <SelectItem value="5001-10000">Entre R$ 5.001 e R$ 10.000</SelectItem>
-                  <SelectItem value="10001-50000">Entre R$ 10.001 e R$ 50.000</SelectItem>
-                  <SelectItem value="50001+">Acima de R$ 50.000</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="faturamento_com_blog">Faturamento mensal com o blog</Label>
+              <select
+                id="faturamento_com_blog"
+                name="faturamento_com_blog"
+                className="px-4 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                value={formData.faturamento_com_blog}
+                onChange={handleFormChange}
+                required
+              >
+                <option value="">Selecione uma faixa</option>
+                <option value="Não faturo ainda">Não faturo ainda</option>
+                <option value="Entre R$ 1 e R$ 1.000">Entre R$ 1 e R$ 1.000</option>
+                <option value="Entre R$ 1.001 e R$ 5.000">Entre R$ 1.001 e R$ 5.000</option>
+                <option value="Entre R$ 5.001 e R$ 10.000">Entre R$ 5.001 e R$ 10.000</option>
+                <option value="Entre R$ 10.001 e R$ 50.000">Entre R$ 10.001 e R$ 50.000</option>
+                <option value="Acima de R$ 50.000">Acima de R$ 50.000</option>
+              </select>
             </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleAnalyzeSubmit} className="gradient-bg text-white">
-              Analisar meu blog
-            </Button>
-          </DialogFooter>
+            {/* Campos ocultos */}
+            <input type="hidden" name="utm_source" value={formData.utm_source} />
+            <input type="hidden" name="utm_campaign" value={formData.utm_campaign} />
+            <input type="hidden" name="utm_medium" value={formData.utm_medium} />
+            <input type="hidden" name="utm_content" value={formData.utm_content} />
+            <input type="hidden" name="utm_term" value={formData.utm_term} />
+            <input type="hidden" name="cidade" value={formData.cidade} />
+            <input type="hidden" name="estado" value={formData.estado} />
+            <input type="hidden" name="pais" value={formData.pais} />
+            <input type="hidden" name="dispositivo" value={formData.dispositivo} />
+            <input type="hidden" name="url_pagina" value={formData.url_pagina} />
+            <input type="hidden" name="app_blogwp" value={formData.app_blogwp} />
+            <input type="hidden" name="app_plano" value={formData.app_plano} />
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setIsDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="gradient-bg text-white" disabled={loading}>
+                {loading ? 'Enviando...' : 'Enviar'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
