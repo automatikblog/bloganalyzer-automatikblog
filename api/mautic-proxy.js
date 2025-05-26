@@ -15,6 +15,9 @@ export default async function handler(req, res) {
       body += chunk;
     }
 
+    // Log para debug
+    console.log('Body recebido:', body);
+
     const mauticResponse = await fetch(
       'https://mautic.automatiklabs.com/form/submit?formId=14',
       {
