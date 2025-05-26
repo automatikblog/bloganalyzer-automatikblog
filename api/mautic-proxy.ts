@@ -10,17 +10,10 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Importa raw-body dinamicamente (compatível com ESM)
-    const getRawBody = (await import('raw-body')).default;
-    const bodyBuffer = await getRawBody(req);
-
-    // Converte o buffer para FormData
-    const formData = new FormData();
-    const text = bodyBuffer.toString('utf-8');
-    const params = new URLSearchParams(text);
-    
-    for (const [key, value] of params.entries()) {
-      formData.append(key, value);
+    // Lê o corpo da requisição sem raw-body
+    let body = '';
+    for await (const chunk of req) {
+      body += chunk;
     }
 
     // Repassa para o Mautic
@@ -29,9 +22,9 @@ export default async function handler(req: any, res: any) {
       {
         method: 'POST',
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': req.headers['content-type'] || 'application/x-www-form-urlencoded',
         },
-        body: formData,
+        body,
       }
     )
 
