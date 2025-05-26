@@ -31,6 +31,7 @@ export default async function handler(req: any, res: any) {
     const data = await mauticResponse.text()
     res.status(mauticResponse.status).send(data)
   } catch (err: any) {
-    res.status(500).json({ error: 'Erro ao repassar para o Mautic', details: err?.message })
+    console.error('Erro no proxy Mautic:', err);
+    res.status(500).json({ error: 'Erro ao repassar para o Mautic', details: err?.message, stack: err?.stack });
   }
 } 
