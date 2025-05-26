@@ -297,10 +297,20 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
               setMsg("");
               // Enviar para o backend (webhook)
               try {
+                const record_id = await createWebhookRecord({
+                  url: formData.url_pagina,
+                  nome: formData.nome,
+                  email: formData.email,
+                  telefone: formData.telefone,
+                  faturamento: formData.faturamento_com_blog,
+                  results: '',
+                });
                 const payload = {
                   ...formData,
                   formId: '14',
                   formName: 'appanalyze',
+                  url: formData.url_pagina,
+                  record_id,
                 };
                 await fetch('https://webhooks.automatiklabs.com/webhook/testar-blog', {
                   method: 'POST',
