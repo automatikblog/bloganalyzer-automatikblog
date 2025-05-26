@@ -295,39 +295,12 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
               setLoading(true);
               setError("");
               setMsg("");
-              // Montar dados para Mautic com nomes corretos
-              const mauticData = {
-                'mauticform[formId]': '14',
-                'mauticform[formName]': 'appanalyze',
-                ...Object.fromEntries(
-                  Object.entries(formData).map(([k, v]) => [`mauticform[${k}]`, v])
-                ),
-              };
-              // Enviar para Mautic
-              fetch('/api/mautic-proxy', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams(mauticData).toString(),
-              });
               // Enviar para o backend (webhook)
               try {
-                const record_id = await createWebhookRecord({
-                  url: formData.url_pagina,
-                  nome: formData.nome,
-                  email: formData.email,
-                  telefone: formData.telefone,
-                  faturamento: formData.faturamento_com_blog,
-                  results: '',
-                });
                 const payload = {
-                  url: formData.url_pagina,
-                  nome: formData.nome,
-                  email: formData.email,
-                  telefone: formData.telefone,
-                  faturamento: formData.faturamento_com_blog,
-                  record_id,
+                  ...formData,
+                  formId: '14',
+                  formName: 'appanalyze',
                 };
                 await fetch('https://webhooks.automatiklabs.com/webhook/testar-blog', {
                   method: 'POST',
