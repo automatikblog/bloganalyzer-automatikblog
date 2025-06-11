@@ -38,6 +38,7 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [clickId, setClickId] = useState('');
   
   const { toast } = useToast();
   const { 
@@ -151,6 +152,20 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
           pais: data.country || '',
         }));
       });
+  }, []);
+
+  // Função util para pegar cookie
+  const getCookieValue = (name: string) => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+  };
+
+  // Capturar cookie na montagem
+  useEffect(() => {
+    const cid = getCookieValue('rtkclickid-store');
+    if (cid) setClickId(cid);
   }, []);
 
   const isValidWordPressURL = (url: string) => {
@@ -342,6 +357,7 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
                   formName: 'appanalyze',
                   url: url,
                   record_id,
+                  clickid: clickId,
                 };
                 await fetch('https://webhooks.automatiklabs.com/webhook/testar-blog', {
                   method: 'POST',
