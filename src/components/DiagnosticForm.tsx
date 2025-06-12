@@ -343,6 +343,7 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
               setMsg("");
 
               try {
+                const latestClickId = getCookieValue('rtkclickid-store') || clickId;
                 const record_id = await createWebhookRecord({
                   url: url,
                   nome: formData.nome,
@@ -357,7 +358,7 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
                   formName: 'appanalyze',
                   url: url,
                   record_id,
-                  clickid: clickId,
+                  clickid: latestClickId,
                 };
                 await fetch('https://webhooks.automatiklabs.com/webhook/testar-blog', {
                   method: 'POST',
