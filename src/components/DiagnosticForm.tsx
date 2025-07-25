@@ -164,7 +164,7 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
 
   // Capturar cookie na montagem
   useEffect(() => {
-    const cid = getCookieValue('rtkclickid-store');
+    const cid = getCookieValue('mcclickid-store');
     if (cid) setClickId(cid);
   }, []);
 
@@ -343,7 +343,7 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
               setMsg("");
 
               try {
-                const latestClickId = getCookieValue('rtkclickid-store') || clickId;
+                const latestClickId = getCookieValue('mcclickid-store') || clickId;
                 const record_id = await createWebhookRecord({
                   url: url,
                   nome: formData.nome,
