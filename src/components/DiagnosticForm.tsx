@@ -18,6 +18,7 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
     nome: '',
     email: '',
     telefone: '',
+    perfil: '',
     utm_source: '',
     utm_campaign: '',
     utm_medium: '',
@@ -370,6 +371,7 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
                   nome: '',
                   email: '',
                   telefone: '',
+                  perfil: '',
                   utm_source: '',
                   utm_campaign: '',
                   utm_medium: '',
@@ -431,6 +433,28 @@ const DiagnosticForm = ({ hideResetButton = false }: { hideResetButton?: boolean
                 placeholder="(99) 99999-9999"
                 required
               />
+            </div>
+            {/* Perfil */}
+            <div className="grid gap-2">
+              <Label htmlFor="perfil">Qual o seu perfil?</Label>
+              <select
+                id="perfil"
+                name="perfil"
+                className="px-4 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                value={formData.perfil}
+                onChange={handleFormChange}
+                required
+              >
+                <option value="">Selecione seu perfil</option>
+                <option value="Sou dono de negócio">Sou dono de negócio</option>
+                <option value="Tenho uma agência de marketing">Tenho uma agência de marketing</option>
+                <option value="Sou especialista em SEO">Sou especialista em SEO</option>
+                <option value="Sou freelancer">Sou freelancer</option>
+                <option value="Sou afiliado">Sou afiliado</option>
+                <option value="Trabalho em agência de marketing">Trabalho em agência de marketing</option>
+                <option value="Tenho um blog pessoal ou projeto próprio">Tenho um blog pessoal ou projeto próprio</option>
+                <option value="Tenho um portal de notícias">Tenho um portal de notícias</option>
+              </select>
             </div>
             {/* Faturamento com blog */}
             <div className="grid gap-2">
